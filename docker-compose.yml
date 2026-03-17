@@ -28,6 +28,7 @@ services:
       - COLLECTION_NAME=${COLLECTION_NAME:-policy_helper}
       - CHUNK_SIZE=${CHUNK_SIZE:-700}
       - CHUNK_OVERLAP=${CHUNK_OVERLAP:-80}
+      - PYTHONPATH=/app
     volumes:
       - ./data:/app/data:ro
     ports:
