@@ -1,5 +1,6 @@
 import time, os, math, json, hashlib
 from typing import List, Dict, Tuple
+import uuid
 import numpy as np
 from .settings import settings
 from .ingest import chunk_text, doc_hash
@@ -69,8 +70,17 @@ class QdrantStore:
 
     def upsert(self, vectors: List[np.ndarray], metadatas: List[Dict]):
         points = []
-        for i, (v, m) in enumerate(zip(vectors, metadatas)):
-            points.append(qm.PointStruct(id=m.get("id") or m.get("hash") or i, vector=v.tolist(), payload=m))
+        for i, (vector, metadata) in enumerate(zip(vectors, metadatas)):
+            raw_id = metadata.get("id") or metadata.get("hash") or str(i)
+            
+            point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(raw_id)))
+
+            points.append(qm.PointStruct(
+                id=point_id, 
+                vector=vector.tolist(), 
+                payload=metadata
+            ))
+        
         self.client.upsert(collection_name=self.collection, points=points)
 
     def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
