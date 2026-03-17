@@ -1,6 +1,7 @@
 import os, re, hashlib
 from typing import List, Dict, Tuple
 from .settings import settings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 def _read_text_file(path: str) -> str:
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -20,15 +21,12 @@ def _md_sections(text: str) -> List[Tuple[str, str]]:
     return out or [("Body", text)]
 
 def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
-    tokens = text.split()
-    chunks = []
-    i = 0
-    while i < len(tokens):
-        chunk = tokens[i:i+chunk_size]
-        chunks.append(" ".join(chunk))
-        if i + chunk_size >= len(tokens): break
-        i += chunk_size - overlap
-    return chunks
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=overlap,
+        separators=["\n\n", "\n", ". ", " ", ""]
+    )
+    return splitter.split_text(text)
 
 def load_documents(data_dir: str) -> List[Dict]:
     docs = []
