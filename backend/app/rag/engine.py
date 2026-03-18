@@ -1,0 +1,86 @@
+import time
+from typing import List, Dict, Tuple
+from ..settings import settings
+from ..ingest import doc_hash
+from .embedder import LocalEmbedder
+from .llms import StubLLM, OpenRouterLLM
+from .metrics import Metrics
+from .stores import QdrantStore, InMemoryStore
+
+class RAGEngine:
+    def __init__(self):
+        self.embedder = LocalEmbedder(dim=384)
+        # Vector store selection
+        if settings.vector_store == "qdrant":
+            try:
+                self.store = QdrantStore(collection=settings.collection_name, dim=384)
+            except Exception:
+                self.store = InMemoryStore(dim=384)
+        else:
+            self.store = InMemoryStore(dim=384)
+
+        # LLM selection
+        if settings.llm_provider == "openrouter" and settings.openrouter_api_key:
+            try:
+                self.llm = OpenRouterLLM(
+                    api_key=settings.openrouter_api_key,
+                    model=settings.llm_model,
+                )
+                self.llm_name = f"openrouter:{settings.llm_model}"
+            except Exception:
+                self.llm = StubLLM()
+                self.llm_name = "stub"
+        else:
+            self.llm = StubLLM()
+            self.llm_name = "stub"
+
+        self.metrics = Metrics()
+        self._doc_titles = set()
+        self._chunk_count = 0
+
+    def ingest_chunks(self, chunks: List[Dict]) -> Tuple[int, int]:
+        vectors = []
+        metas = []
+        doc_titles_before = set(self._doc_titles)
+
+        for ch in chunks:
+            text = ch["text"]
+            h = doc_hash(text)
+            meta = {
+                "id": h,
+                "hash": h,
+                "title": ch["title"],
+                "section": ch.get("section"),
+                "text": text,
+            }
+            v = self.embedder.embed(text)
+            vectors.append(v)
+            metas.append(meta)
+            self._doc_titles.add(ch["title"])
+            self._chunk_count += 1
+
+        self.store.upsert(vectors, metas)
+        return (len(self._doc_titles) - len(doc_titles_before), len(metas))
+
+    def retrieve(self, query: str, k: int = 4) -> List[Dict]:
+        t0 = time.time()
+        qv = self.embedder.embed(query)
+        results = self.store.search(qv, k=k)
+        self.metrics.add_retrieval((time.time()-t0)*1000.0)
+        return [meta for score, meta in results]
+
+    def generate(self, query: str, contexts: List[Dict]) -> str:
+        t0 = time.time()
+        answer = self.llm.generate(query, contexts)
+        self.metrics.add_generation((time.time()-t0)*1000.0)
+        return answer
+
+    def stats(self) -> Dict:
+        m = self.metrics.summary()
+        return {
+            "total_docs": len(self._doc_titles),
+            "total_chunks": self._chunk_count,
+            "embedding_model": settings.embedding_model,
+            "llm_model": self.llm_name,
+            **m
+        }
