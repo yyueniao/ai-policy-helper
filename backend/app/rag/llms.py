@@ -22,11 +22,29 @@ class OpenRouterLLM:
         )
         self.model = model
 
-    def generate(self, query: str, contexts: List[Dict]) -> str:
-        prompt = f"You are a helpful company policy assistant. Cite sources by title and section when relevant.\nQuestion: {query}\nSources:\n"
+    def _get_prompt(self, query: str, contexts: List[Dict]) -> str:
+        header = (
+            "You are a helpful company policy assistant. "
+            "Cite sources by title and section when relevant.\n"
+            f"Question: {query}\n"
+            "Sources:\n"
+        )
+        
+        source_blocks = []
         for c in contexts:
-            prompt += f"- {c.get('title')} | {c.get('section')}\n{c.get('text')[:600]}\n---\n"
-        prompt += "Write a concise, accurate answer grounded in the sources. If unsure, say so."
+            title = c.get('title', 'Unknown Title')
+            section = c.get('section', 'General')
+            text_snippet = c.get('text', '')[:600]
+            
+            block = f"- {title} | {section}\n{text_snippet}\n---"
+            source_blocks.append(block)
+            
+        footer = "Write a concise, accurate answer grounded in the sources. If unsure, say so."
+        
+        return f"{header}\n" + "\n".join(source_blocks) + f"\n\n{footer}"
+
+    def generate(self, query: str, contexts: List[Dict]) -> str:
+        prompt = self._get_prompt(query, contexts)
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role":"user","content":prompt}],
