@@ -1,5 +1,5 @@
 import time
-from typing import List, Dict, Tuple
+from typing import Generator, List, Dict, Tuple
 from ..settings import settings
 from ..ingest import doc_hash
 from .embedder import LocalEmbedder
@@ -69,11 +69,12 @@ class RAGEngine:
         self.metrics.add_retrieval((time.time()-t0)*1000.0)
         return [meta for score, meta in results]
 
-    def generate(self, query: str, contexts: List[Dict]) -> str:
+    def generate(self, query: str, contexts: List[Dict]) -> Generator[str,None,None]:
         t0 = time.time()
-        answer = self.llm.generate(query, contexts)
+        token_stream = self.llm.generate(query, contexts)
+        for token in token_stream:
+            yield token
         self.metrics.add_generation((time.time()-t0)*1000.0)
-        return answer
 
     def stats(self) -> Dict:
         m = self.metrics.summary()

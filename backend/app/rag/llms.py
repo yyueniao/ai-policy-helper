@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, Generator, List
 
 
 class StubLLM:
@@ -58,11 +58,15 @@ class OpenRouterLLM:
         
         return full_prompt
 
-    def generate(self, query: str, contexts: List[Dict]) -> str:
+    def generate(self, query: str, contexts: List[Dict]) -> Generator[str, None, None]:
         prompt = self._get_prompt(query, contexts)
-        resp = self.client.chat.completions.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role":"user","content":prompt}],
-            temperature=0.1
+            temperature=0.1,
+            stream=True
         )
-        return resp.choices[0].message.content
+        for chunk in response:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content

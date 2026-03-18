@@ -23,23 +23,42 @@ export default function Chat() {
 
   const send = async () => {
     if (!q.trim() || loading) return;
+
     const userMsg: Message = { role: "user", content: q };
-    setMessages((prev) => [...prev, userMsg]);
+    const aiPlaceholder: Message = { role: "assistant", content: "" };
+
+    setMessages((prev) => [...prev, userMsg, aiPlaceholder]);
     setLoading(true);
+    const currentQuery = q;
     setQ("");
 
     try {
-      const res = await apiAsk(q);
-      const aiMsg: Message = {
-        role: "assistant",
-        content: res.answer,
-        citations: res.citations,
-        chunks: res.chunks,
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+      const stream = apiAsk(currentQuery);
+
+      for await (const chunk of stream) {
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const lastIndex = newMessages.length - 1;
+          const lastMsg = newMessages[lastIndex];
+
+          if (chunk.type === "metadata") {
+            newMessages[lastIndex] = {
+              ...lastMsg,
+              citations: chunk.citations,
+              chunks: chunk.chunks,
+            };
+          } else if (chunk.type === "text") {
+            newMessages[lastIndex] = {
+              ...lastMsg,
+              content: lastMsg.content + chunk.content,
+            };
+          }
+          return newMessages;
+        });
+      }
     } catch (e: any) {
       setMessages((prev) => [
-        ...prev,
+        ...prev.slice(0, -1),
         { role: "assistant", content: `Error: ${e.message}` },
       ]);
     } finally {
