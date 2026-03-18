@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Generator, List, Dict, Tuple
 from ..settings import settings
@@ -85,3 +86,26 @@ class RAGEngine:
             "llm_model": self.llm_name,
             **m
         }
+    
+    def ask_stream(self, query: str, k: int = 4) -> Generator[str, None, None]:
+        ctx = self.retrieve(query, k=k)
+        citations = [
+            {"title": c.get("title"), "section": c.get("section")} 
+            for c in ctx
+        ]
+        chunks = [
+            {"title": c.get("title"), "section": c.get("section"), "text": c.get("text")} 
+            for c in ctx
+        ]
+        
+        metadata = {
+            "citations": citations,
+            "chunks": chunks,
+            "metrics": self.stats()
+        }
+
+        yield json.dumps(metadata) + "\n[METADATA_END]\n"
+
+        token_stream = self.generate(query, ctx)
+        for token in token_stream:
+            yield token

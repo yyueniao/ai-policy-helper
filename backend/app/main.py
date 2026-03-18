@@ -1,8 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from typing import List
-import json
 from .models import IngestResponse, AskRequest, AskResponse, MetricsResponse, Citation, Chunk
 from .settings import settings
 from .ingest import load_documents
@@ -39,22 +37,12 @@ def ingest():
 
 @app.post("/api/ask", response_model=AskResponse)
 def ask(req: AskRequest):
-    ctx = engine.retrieve(req.query, k=req.k or 4)
-    citations = [Citation(title=c.get("title"), section=c.get("section")) for c in ctx]
-    chunks = [Chunk(title=c.get("title"), section=c.get("section"), text=c.get("text")) for c in ctx]
-    def stream_generator():
-        metadata = {
-            "citations": [c.model_dump() for c in citations],
-            "chunks": [c.model_dump() for c in chunks],
-            "metrics": engine.stats()
-        }
-        yield json.dumps(metadata) + "\n[METADATA_END]\n"
-
-        token_stream = engine.generate(req.query, ctx)
-        for token in token_stream:
-            yield token
+    stream = engine.ask_stream(
+        query=req.query, 
+        k=req.k or 4
+    )
 
     return StreamingResponse(
-        stream_generator(), 
+        stream, 
         media_type="text/event-stream"
     )
