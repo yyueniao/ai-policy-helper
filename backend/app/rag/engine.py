@@ -1,5 +1,7 @@
+import hashlib
 import json
 import time
+from cachetools import TTLCache
 from typing import Generator, List, Dict, Tuple
 from ..settings import settings
 from ..ingest import doc_hash
@@ -38,6 +40,7 @@ class RAGEngine:
         self.metrics = Metrics()
         self._doc_titles = set()
         self._chunk_count = 0
+        self.cache = TTLCache(maxsize=100, ttl=3600)
 
     def ingest_chunks(self, chunks: List[Dict]) -> Tuple[int, int]:
         vectors = []
@@ -88,6 +91,14 @@ class RAGEngine:
         }
     
     def ask_stream(self, query: str, k: int = 4) -> Generator[str, None, None]:
+        cache_key = hashlib.md5(f"{query}:{k}".encode()).hexdigest()
+
+        if cache_key in self.cache:
+            cached_data = self.cache[cache_key]
+            yield json.dumps(cached_data["metadata"]) + "\n[METADATA_END]\n"
+            yield cached_data["answer"]
+            return
+        
         ctx = self.retrieve(query, k=k)
         citations = [
             {"title": c.get("title"), "section": c.get("section")} 
@@ -107,5 +118,15 @@ class RAGEngine:
         yield json.dumps(metadata) + "\n[METADATA_END]\n"
 
         token_stream = self.generate(query, ctx)
-        for token in token_stream:
-            yield token
+        full_answer = []
+
+        try:
+            for token in token_stream:
+                full_answer.append(token) 
+                yield token               
+        finally:
+            if full_answer:
+                self.cache[cache_key] = {
+                    "metadata": metadata,
+                    "answer": "".join(full_answer)
+                }
