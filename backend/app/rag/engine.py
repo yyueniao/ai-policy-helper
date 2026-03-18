@@ -3,6 +3,8 @@ import json
 import time
 from cachetools import TTLCache
 from typing import Generator, List, Dict, Tuple
+
+from .pdpa import StreamGuard
 from ..settings import settings
 from ..ingest import doc_hash
 from .embedder import LocalEmbedder
@@ -117,11 +119,12 @@ class RAGEngine:
 
         yield json.dumps(metadata) + "\n[METADATA_END]\n"
 
-        token_stream = self.generate(query, ctx)
+        raw_stream = self.generate(query, ctx)
+        guard = StreamGuard()
         full_answer = []
 
         try:
-            for token in token_stream:
+            for token in guard.mask(raw_stream):
                 full_answer.append(token) 
                 yield token               
         finally:
