@@ -63,13 +63,20 @@ class QdrantStore:
         self.client.upsert(collection_name=self.collection, points=points)
 
     def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
-        res = self.client.search(
+        res = self.client.query_points(
             collection_name=self.collection,
-            query_vector=query.tolist(),
+            query=qm.NearestQuery(
+                nearest=query.tolist(),
+                mmr=qm.Mmr(
+                    diversity=0.5,
+                    candidates_limit=20
+                )
+            ),
             limit=k,
             with_payload=True
         )
+        
         out = []
-        for r in res:
+        for r in res.points:
             out.append((float(r.score), dict(r.payload)))
         return out
