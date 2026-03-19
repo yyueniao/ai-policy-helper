@@ -6,3 +6,10 @@ export interface Metrics {
   embedding_model: string;
   llm_model: string;
 }
+
+export interface Message {
+  role: "user" | "assistant";
+  content: string;
+  citations?: { title: string; section?: string }[];
+  chunks?: { title: string; section?: string; text: string }[];
+};

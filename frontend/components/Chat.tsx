@@ -1,13 +1,8 @@
 "use client";
 import React, { useRef, useEffect } from "react";
 import { apiAsk } from "@/lib/api";
-
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-  citations?: { title: string; section?: string }[];
-  chunks?: { title: string; section?: string; text: string }[];
-};
+import ChatMessage from "./ChatMessage";
+import { Message } from "@/lib/models";
 
 export default function Chat() {
   const [messages, setMessages] = React.useState<Message[]>([]);
@@ -87,76 +82,8 @@ export default function Chat() {
           </div>
         )}
 
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[85%] space-y-2 ${m.role === "user" ? "order-1" : "order-2"}`}
-            >
-              <div
-                className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                  m.role === "user"
-                    ? "bg-indigo-600 text-white rounded-tr-none"
-                    : "bg-white border border-slate-200 text-slate-800 rounded-tl-none"
-                }`}
-              >
-                {m.content}
-              </div>
-
-              {m.role === "assistant" && (
-                <div className="space-y-3 px-1">
-                  {m.citations && m.citations.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {m.citations.map((c, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2 py-1 bg-slate-100 text-[10px] font-bold text-slate-600 rounded uppercase tracking-tight border border-slate-200"
-                        >
-                          {c.title} {c.section && `• ${c.section}`}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {m.chunks && m.chunks.length > 0 && (
-                    <details className="group border border-slate-200 rounded-lg bg-white overflow-hidden transition-all">
-                      <summary className="list-none px-3 py-2 text-[11px] font-semibold text-slate-500 cursor-pointer hover:bg-slate-50 flex items-center justify-between">
-                        VERIFY SOURCES
-                        <svg
-                          className="w-3 h-3 transition-transform group-open:rotate-180"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M19 9l-7 7-7-7"
-                            strokeWidth={2}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </summary>
-                      <div className="p-3 space-y-3 border-t border-slate-100 bg-slate-50/50">
-                        {m.chunks.map((c, idx) => (
-                          <div
-                            key={idx}
-                            className="text-[11px] text-slate-600 leading-normal border-l-2 border-indigo-400 pl-3 py-1"
-                          >
-                            <span className="font-bold text-slate-800 block mb-1">
-                              {c.title} — {c.section}
-                            </span>
-                            {c.text}
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+        {messages.map((message, index) => (
+          <ChatMessage key={index} message={message} />
         ))}
 
         {loading && (
